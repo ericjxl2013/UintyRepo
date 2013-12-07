@@ -7,6 +7,7 @@ public class AutoDisplayControl : MonoBehaviour {
 	SoftkeyModule Softkey_Script;
 	ProgramModule Program_Script;
 	ClientCenter ClientCenter_Script;
+	HandWheelModule HandWheel_Script;
 	List<string> G_Display = new List<string>();
 	List<string> G_Address = new List<string>();
 	List<float> Address_Value = new List<float>();
@@ -26,16 +27,24 @@ public class AutoDisplayControl : MonoBehaviour {
 	bool old_p2_get = false;  //get the 2nd point position
 	
 	
-	int pattern = 0;
+	int pattern = 0;  //当前是何种操作
 	float x = 0;
 	float y = 0;
-	float distance1 = 0;
+	float distance2V = 0;
+	
+	float pressTime = 0;
+	const float TIMELIMIT = 0.3f;
+	bool motionAllow = false;
+	float oldDistance = 0;
+	float newDistance = 0;
+	
 	// Use this for initialization
 	void Start () {
 		Main = gameObject.GetComponent<ControlPanel>();
 		Softkey_Script = gameObject.GetComponent<SoftkeyModule>();
 		Program_Script = gameObject.GetComponent<ProgramModule>();
 		ClientCenter_Script = gameObject.GetComponent<ClientCenter>();
+		HandWheel_Script = GameObject.Find ("HandleControl").GetComponent<HandWheelModule> ();
 		current_resolutin = Screen.currentResolution;
 //		if(current_resolutin.width > 1680)
 //		{
@@ -52,10 +61,7 @@ public class AutoDisplayControl : MonoBehaviour {
 	
 	void OnGUI ()
 	{
-		GUILayout.Label("Pattern: " + pattern);
-		GUILayout.Label("X: " + x);
-		GUILayout.Label("Y: " + y);
-		GUILayout.Label("Distance: " + distance1);
+		
 	}
 	
 //	
@@ -246,37 +252,123 @@ public class AutoDisplayControl : MonoBehaviour {
 		Program_Script.SetModalState(ModalIndex, ModalString);
 	}
 	
+	
 	[RPC]
-	void RotateAAA ()
+	void MobileMotion(bool state)
+	{	
+	}
+	
+	[RPC]
+	void RotateMotion (string xy)
 	{
+	}
+	
+    [RPC]
+	void ZoomMotion(float dis)
+	{
+	}
+	
+	[RPC]
+	void MoveMotion(string xy)
+	{	
 	}
 	
 	// Update is called once per frame
 	void Update () {
 		
-		if(Input.touchCount > 0){
-			if(Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Moved)
-			{
-				pattern = 1;
-				x = Input.GetTouch(0).deltaPosition.x;
-				y = Input.GetTouch(0).deltaPosition.y;
-				networkView.RPC("RotateAAA", RPCMode.Server, x+","+y);
+		if(!ClientCenter_Script.client_window_on && !HandWheel_Script.touchMotion){
+			if(Input.touchCount > 0){
+				//一定时间后才启动Motion控制
+				if(!motionAllow){
+					pressTime += Time.deltaTime;
+					if(pressTime > TIMELIMIT){
+						motionAllow = true;
+						networkView.RPC("MobileMotion", RPCMode.Server, true);
+						pressTime = 0;
+					}
+				}else{  //启动Motion
+					//一个手指旋转
+					if(Input.touchCount == 1 && Input.GetTouch(0).phase == TouchPhase.Moved)
+					{
+						pattern = 1;
+						x = Input.GetTouch(0).deltaPosition.x;
+						y = Input.GetTouch(0).deltaPosition.y;
+						if(x > 10f)
+							x = x / 10f;
+						else
+							x = x / 5f;
+						if(y > 10f)
+							y = y / 10f;
+						else
+							y = y / 5f;
+						networkView.RPC("RotateMotion", RPCMode.Server, x+","+y);
+					}
+					//一个手指时没有移动，则旋转数据为0
+					if(Input.touchCount == 1 && Input.GetTouch(0).phase != TouchPhase.Moved){
+						x = 0; y = 0;
+						networkView.RPC("RotateMotion", RPCMode.Server, "0,0");
+					}
+					
+					//两个手指缩放
+					if(Input.touchCount == 2 && (Input.GetTouch(0).phase == TouchPhase.Moved || Input.GetTouch(1).phase == TouchPhase.Moved)){
+						pattern = 2;
+						newDistance = Vector2.Distance(Input.GetTouch(0).position, Input.GetTouch(1).position);
+						if(newDistance < oldDistance){
+							networkView.RPC("ZoomMotion", RPCMode.Server, 0.2f);
+							distance2V = 1;
+						}else if(newDistance > oldDistance){
+							networkView.RPC("ZoomMotion", RPCMode.Server, -0.2f);
+							distance2V = -1;
+						}else{
+							networkView.RPC("ZoomMotion", RPCMode.Server, 0f);
+							distance2V = 0;
+						}
+						oldDistance = newDistance;		
+					}
+					//两个手指不动时缩放失效
+					if(Input.touchCount == 2 && (Input.GetTouch(0).phase != TouchPhase.Moved && Input.GetTouch(1).phase != TouchPhase.Moved)){
+						oldDistance = 0;
+						newDistance = 0;
+						distance2V = 2;
+						networkView.RPC("ZoomMotion", RPCMode.Server, 0f);
+					}
+					
+					//三个手指平移
+					if(Input.touchCount == 3 && (Input.GetTouch(0).phase == TouchPhase.Moved && Input.GetTouch(1).phase == TouchPhase.Moved && Input.GetTouch(2).phase == TouchPhase.Moved)){
+						pattern = 3;
+						x = Input.GetTouch(0).deltaPosition.x;
+						y = Input.GetTouch(0).deltaPosition.y;
+						if(x > 10f)
+							x = x / 10f;
+						else
+							x = x / 5f;
+						if(y > 10f)
+							y = y / 10f;
+						else
+							y = y / 5f;
+						networkView.RPC("MoveMotion", RPCMode.Server, x+","+y);
+					}
+					//三个手指平移失效
+					if(Input.touchCount == 3 && !(Input.GetTouch(0).phase == TouchPhase.Moved && Input.GetTouch(1).phase == TouchPhase.Moved && Input.GetTouch(2).phase == TouchPhase.Moved)){
+						x = 0; y = 0;
+						networkView.RPC("MoveMotion", RPCMode.Server, "0,0");
+					}
+				}
+			}else{
+				if(motionAllow){
+					networkView.RPC("MobileMotion", RPCMode.Server, false);
+					x = 0;
+					y = 0;
+					distance2V = 0;
+					oldDistance = 0;
+					newDistance = 0;
+					pattern = 0;
+					pressTime = 0;
+					motionAllow = false;
+				}
 			}
-			
-			if(Input.touchCount == 2 && (Input.GetTouch(0).phase == TouchPhase.Moved || Input.GetTouch(1).phase == TouchPhase.Moved)){
-				pattern = 2;
-				distance1 = Vector2.Distance(Input.GetTouch(0).position, Input.GetTouch(1).position);
-			}
-			
-			if(Input.touchCount == 3 && (Input.GetTouch(0).phase == TouchPhase.Moved && Input.GetTouch(1).phase == TouchPhase.Moved && Input.GetTouch(2).phase == TouchPhase.Moved)){
-				pattern = 3;
-				x = Input.GetTouch(0).deltaPosition.x;
-				y = Input.GetTouch(0).deltaPosition.y;
-			}
-		}else{
-			pattern = 0;
 		}
-		
+			
 		
 //		//Record the 1st point 
 //		if(Input.touchCount > 0 && !old_p1_get)

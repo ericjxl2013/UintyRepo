@@ -151,6 +151,8 @@ public class HandWheelModule : MonoBehaviour {
 	
 	float angleStore = 0;
 	
+	public bool touchMotion = false;
+	
 	void Awake()
 	{
 			
@@ -366,6 +368,19 @@ public class HandWheelModule : MonoBehaviour {
 		if(wheelshow_flag){
 			win_rect =GUI.Window(11, win_rect, Warnning, "",Main.HandWheel_backgraound);
 			GUI.BringWindowToFront(11);
+			if(Input.touchCount > 0){
+				if(Input.GetTouch(0).phase == TouchPhase.Began){
+					if(win_rect.Contains(Input.GetTouch(0).position)){	
+						touchMotion = true;
+					}
+				}
+			}
+		}
+		
+		if(Input.touchCount == 0){
+				if(touchMotion){
+					touchMotion = false;
+				}
 		}
 		
 		if(firstclick_time !=0f && (Input.GetMouseButtonDown(0) || (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)))
