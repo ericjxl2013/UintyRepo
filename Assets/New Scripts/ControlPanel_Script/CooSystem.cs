@@ -1,0 +1,1568 @@
+﻿using UnityEngine;
+using System.Collections;
+using System.IO;
+using System;
+using System.Text.RegularExpressions;
+using System.Collections.Generic;
+
+public class CooSystem : MonoBehaviour {
+	
+	ControlPanel Main;
+//	MoveControl MoveControl_script;
+	public Vector3 absolute_pos = new Vector3(0,0,0);
+	public Vector3 relative_pos = new Vector3(0,0,0);
+	public Vector3 AbsoluteZero = new Vector3(0, 0, 0);
+	public Vector3 RelativeZero = new Vector3(0, 0, 0);
+	public Vector3 G52Zero = new Vector3(0, 0, 0);
+	public int workpiece_flag = 1;
+	
+	public Vector3 G00_pos = new Vector3(0,0,0);
+	public Vector3 G54_pos = new Vector3(0,0,0);
+	public Vector3 G55_pos = new Vector3(0,0,0);
+	public Vector3 G56_pos = new Vector3(0,0,0);
+	public Vector3 G57_pos = new Vector3(0,0,0);
+	public Vector3 G58_pos = new Vector3(0,0,0);
+	public Vector3 G59_pos = new Vector3(0,0,0);
+	public Vector3 workpiece_coo = new Vector3(0,0,0);
+	
+	//设定界面修改---陈振华---03.11
+	public string parameter_writabel = "1";
+	public string TV_check = "0";
+	public string hole_code = "1";
+	public string input_unit = "0";
+	public string IO = "0";
+	public string sequence_number = "0";
+	public string paper_tape = "0";
+	public string SN_stop1 = "0";
+	public string SN_stop2 = "0";
+	//设定界面修改---陈振华---03.11
+	
+	//刀偏界面加入---陈振华---03.30
+	public float [] shape_H = new float[400];  //形状H
+	public float [] wear_H  = new float[400];  //磨损H
+	public float [] shape_D = new float[400];  //形状D
+	public float [] wear_D  = new float[400];  //磨损D	
+	public float [] write_tool_str = new float[400];
+	//刀偏界面加入---陈振华---03.30
+	
+	//加入坐标系组数---陈晓威---05.7
+	//public string[] GCodeStrs={"EXT","G54","G55","G56","G57","G58","G59"};
+	//public List<Vector3>CooList=new List<Vector3>();
+	
+	void Awake () {
+		
+	}
+	
+	// Use this for initialization
+	void Start () {
+		Main = gameObject.GetComponent<ControlPanel>();
+//		MoveControl_script = GameObject.Find("move_control").GetComponent<MoveControl>();
+//		ReadCooFile();
+		workpiece_coo = G54_pos;
+		workpiece_flag = (int)WorkpieceCooSys.G54;
+		absolute_pos = Main.MachineCoo - G00_pos - workpiece_coo;
+		relative_pos = Main.MachineCoo - G00_pos - workpiece_coo;
+		AbsoluteZero = - G00_pos - workpiece_coo;
+		RelativeZero = - G00_pos - workpiece_coo;
+	}
+	
+	//获得设置界面显示值
+	[RPC]
+	void CooSystemArgumentsInitializeRPC (string argument_string)
+	{
+		string[] argument_str_array = argument_string.Split (',');
+		//parameter_writabel  0
+		parameter_writabel = argument_str_array[0];
+		//TV_check  1
+		TV_check = argument_str_array[1];
+		//hole_code  2
+		hole_code = argument_str_array[2];
+		//input_unit  3
+		input_unit = argument_str_array[3];
+		//IO  4
+		IO = argument_str_array[4];
+		//sequence_number   5
+		sequence_number = argument_str_array[5];
+		//paper_tape  6
+		paper_tape = argument_str_array[6];
+		//SN_stop1  7
+		SN_stop1 = argument_str_array[7];
+		//SN_stop2  8
+		SN_stop2 = argument_str_array[8];
+	}
+	
+	//刀偏数据获得
+	[RPC]
+	void ReadToolInfoRPC (string argument_string)
+	{
+		string[] argument_str_array = argument_string.Split (',');
+		for(int i = 0; i < argument_str_array.Length/4; i++)
+		{
+			shape_H[i] = float.Parse(argument_str_array[4*i]);
+			wear_H[i] = float.Parse(argument_str_array[4*i + 1]);
+			shape_D[i] = float.Parse(argument_str_array[4*i + 2]);
+			wear_D[i] = float.Parse(argument_str_array[4*i + 3]);
+		}	
+	}
+	
+	//坐标系数据获得
+	[RPC]
+	void ReadCooInfoRPC (string argument_string)
+	{
+//		Debug.Log(argument_string);
+		string[] argument_str_array = argument_string.Split (',');
+		G00_pos.Set(float.Parse(argument_str_array[3*0]), float.Parse(argument_str_array[3*0+1]), float.Parse(argument_str_array[3*0+2]));
+		G54_pos.Set(float.Parse(argument_str_array[3*1]), float.Parse(argument_str_array[3*1+1]), float.Parse(argument_str_array[3*1+2]));
+		G55_pos.Set(float.Parse(argument_str_array[3*2]), float.Parse(argument_str_array[3*2+1]), float.Parse(argument_str_array[3*2+2]));
+		G56_pos.Set(float.Parse(argument_str_array[3*3]), float.Parse(argument_str_array[3*3+1]), float.Parse(argument_str_array[3*3+2]));
+		G57_pos.Set(float.Parse(argument_str_array[3*4]), float.Parse(argument_str_array[3*4+1]), float.Parse(argument_str_array[3*4+2]));
+		G58_pos.Set(float.Parse(argument_str_array[3*5]), float.Parse(argument_str_array[3*5+1]), float.Parse(argument_str_array[3*5+2]));
+		G59_pos.Set(float.Parse(argument_str_array[3*6]), float.Parse(argument_str_array[3*6+1]), float.Parse(argument_str_array[3*6+2]));
+	}
+	
+	[RPC]
+	void Tool_Info_WriteRPC(string info)
+	{
+		
+	}
+	
+	[RPC]
+	void Parameter_Info_WriteRPC(string info)
+	{
+	}
+	
+	[RPC]
+	void SaveCooRPC(string info)
+	{
+	}
+	
+	//刀偏界面下移
+	public void tool_down()
+	{
+		if(Main.tool_setting>=1&&Main.tool_setting<=28)
+	   		Main.tool_setting  += 4;
+		else if(Main.tool_setting == 29)
+		{
+			if(Main.ToolOffSetPage_num < 49)
+			{
+				Tool_pagedown();
+				Main.tool_setting = 1;
+			}
+		}
+		else if(Main.tool_setting == 30)
+		{
+			if(Main.ToolOffSetPage_num < 49)
+			{
+				Tool_pagedown();
+				Main.tool_setting = 2;
+			}
+		}
+		else if(Main.tool_setting == 31)
+		{
+			if(Main.ToolOffSetPage_num < 49)
+			{
+				Tool_pagedown();
+				Main.tool_setting = 3;
+			}
+		}
+		else if(Main.tool_setting == 32)
+		{
+			if(Main.ToolOffSetPage_num < 49)
+			{
+				Tool_pagedown();
+				Main.tool_setting = 4;
+			}
+		}
+		//Debug.Log(Main.tool_setting);
+		ToolCursorPos();
+	}
+	
+	//刀偏界面上移
+	public void tool_up()
+	{
+		if(Main.tool_setting>=5 && Main.tool_setting<=32)
+	  		Main.tool_setting  -= 4;
+		else if(Main.tool_setting == 1)
+		{
+			if(Main.ToolOffSetPage_num > 0)
+			{
+				Tool_pageup();
+				Main.tool_setting = 29;
+			}
+		}
+	    else if(Main.tool_setting == 2)
+		{
+			if(Main.ToolOffSetPage_num > 0)
+			{
+				Tool_pageup();
+				Main.tool_setting = 30;
+			}
+		}
+		else if(Main.tool_setting == 3)
+		{
+			
+			if(Main.ToolOffSetPage_num > 0)
+			{
+				Tool_pageup();
+				Main.tool_setting = 31;
+			}
+		}
+		else if(Main.tool_setting == 4)
+		{
+			if(Main.ToolOffSetPage_num > 0)
+			{
+				Tool_pageup();
+				Main.tool_setting = 32;
+			}
+		}
+		ToolCursorPos();
+	}
+	
+	//刀偏界面右移
+	public void tool_right()
+	{
+		if(Main.tool_setting == 32)
+		{
+			if(Main.ToolOffSetPage_num < 49)
+			{
+				Tool_pagedown();
+				Main.tool_setting = 1;
+			}
+		}
+		else
+			Main.tool_setting++;
+		ToolCursorPos();
+	}
+	//刀偏界面左移
+	public void tool_left()
+	{
+		if(Main.tool_setting == 1)
+		{
+			if(Main.ToolOffSetPage_num > 0)
+			{
+				Tool_pageup();
+				Main.tool_setting = 32;
+			}
+		}
+		else
+			Main.tool_setting--;
+		ToolCursorPos();
+	}
+	
+	//刀偏页面下翻
+	public void Tool_pagedown()
+	{
+		Main.ToolOffSetPage_num++;	
+	}
+	
+	//刀偏页面上翻
+	public void Tool_pageup()
+	{
+		Main.ToolOffSetPage_num--;
+	}
+	
+	//黄色背景图片
+	public void ToolCursorPos()
+	{
+		if(Main.tool_setting>= 1 && Main.tool_setting <= 32)
+		{
+			if(Main.tool_setting % 4 == 1)
+			{
+				Main.tool_setting_cursor_w = Main.corner_px + 56f;;
+			}
+			else if (Main.tool_setting % 4 == 2)
+			{
+				Main.tool_setting_cursor_w = Main.corner_px + 166f;;
+			}
+			else if (Main.tool_setting % 4 == 3)
+			{
+				Main.tool_setting_cursor_w = Main.corner_px + 276f;;
+			}
+			else if (Main.tool_setting % 4 == 0)
+			{
+				Main.tool_setting_cursor_w = Main.corner_px + 386f;;
+			}
+			
+			if((int)(Main.tool_setting / 4.1f) == 0)
+				Main.tool_setting_cursor_y = Main.corner_py + 46.5f;	
+			else if((int)(Main.tool_setting / 4.1f) == 1)
+				Main.tool_setting_cursor_y = Main.corner_py + 68.5f;	
+			else if((int)(Main.tool_setting / 4.1f) == 2)
+				Main.tool_setting_cursor_y = Main.corner_py + 91.5f;	
+			else if((int)(Main.tool_setting / 4.1f) == 3)
+				Main.tool_setting_cursor_y = Main.corner_py + 112.5f;	
+			else if((int)(Main.tool_setting / 4.1f) == 4)
+				Main.tool_setting_cursor_y = Main.corner_py + 134.5f;	
+			else if((int)(Main.tool_setting / 4.1f )== 5)
+				Main.tool_setting_cursor_y = Main.corner_py + 156.5f;	
+			else if((int)(Main.tool_setting / 4.1f) == 6)
+				Main.tool_setting_cursor_y = Main.corner_py + 179.5f;	
+			else if((int)(Main.tool_setting / 4.1f) == 7)
+				Main.tool_setting_cursor_y = Main.corner_py + 200.5f;	
+		}
+		//Debug.Log((int)Main.tool_setting / 4.1f);
+	}
+	
+	public void SearchToolNo(string num_str)
+	{
+		Regex isNum_Test = new Regex(@"\D+");
+		if(isNum_Test.IsMatch(num_str))
+		{
+//			Debug.Log("格式错误！请输入1-400");
+			Main.WarnningMessageCreate("格式错误！请输入1-400");
+			return;
+		}
+		int num = int.Parse(num_str);
+		if(num > 400 || num <= 0)
+		{
+//			Debug.Log("格式错误！请输入1-400");
+			Main.WarnningMessageCreate("格式错误！请输入1-400");
+			return;
+		}
+		//Todo: to be modified.
+		if((num-1) % 8 == 0)
+		{
+			Main.ToolOffSetPage_num = ((num-1) / 8);
+			Main.tool_setting = 1;	
+			ToolCursorPos();
+		}
+		else if((num-2) % 8 == 0)
+		{
+			Main.ToolOffSetPage_num = ((num-2) / 8);
+			Main.tool_setting = 5;	
+			ToolCursorPos();
+		}
+		else if((num-3) % 8 == 0)
+		{
+			Main.ToolOffSetPage_num = ((num-3) / 8);
+			Main.tool_setting = 9;	
+			ToolCursorPos();
+		}
+		else if((num-4) % 8 == 0)
+		{
+			Main.ToolOffSetPage_num = ((num-4) / 8);
+			Main.tool_setting = 13;	
+			ToolCursorPos();
+		}
+		else if((num-5) % 8 == 0)
+		{
+			Main.ToolOffSetPage_num = ((num-5) / 8);
+			Main.tool_setting = 17;	
+			ToolCursorPos();
+		}
+		else if((num-6) % 8 == 0)
+		{
+			Main.ToolOffSetPage_num = ((num-6) / 8);
+			Main.tool_setting = 21;	
+			ToolCursorPos();
+		}
+		else if((num-7) % 8 == 0)
+		{
+			Main.ToolOffSetPage_num = ((num-7) / 8);
+			Main.tool_setting = 25;	
+			ToolCursorPos();
+		}
+		else if((num-8) % 8 == 0)
+		{
+			Main.ToolOffSetPage_num = ((num-8) / 8);
+			Main.tool_setting = 29;	
+			ToolCursorPos();
+		}
+		Main.WarnningClear();
+	}
+	
+	//刀偏界面初始数据读取
+	public void ReadToolFile () 
+	{
+		for(int index=0;index<400;index++)
+		{
+			if(PlayerPrefs.HasKey("shape_H"+index)){
+				this.shape_H[index]=PlayerPrefs.GetFloat("shape_H"+index);
+			}
+			else
+			{
+				PlayerPrefs.SetFloat("shape_H"+index,0);
+				this.shape_H[index]=0;
+			}
+			
+			if(PlayerPrefs.HasKey("wear_H"+index))
+				this.wear_H[index]=PlayerPrefs.GetFloat("wear_H"+index);
+			else
+			{
+				PlayerPrefs.SetFloat("wear_H"+index,0);
+				this.wear_H[index]=0;
+			}
+			
+			if(PlayerPrefs.HasKey("shape_D"+index))
+				this.shape_D[index]=PlayerPrefs.GetFloat("shape_D"+index);
+			else
+			{
+				PlayerPrefs.SetFloat("shape_D"+index,0);
+				this.shape_D[index]=0;
+			}
+			
+			if(PlayerPrefs.HasKey("wear_D"+index))
+				this.wear_D[index]=PlayerPrefs.GetFloat("wear_D"+index);
+			else
+			{
+				PlayerPrefs.SetFloat("wear_D"+index,0);
+				this.wear_D[index]=0;
+			}
+			
+		}	
+
+	}
+
+	//刀偏c输入功能
+	public void C_Input (string tool_value)
+	{
+		char[] tool_choose = tool_value.ToCharArray();
+		float value_f = 0;
+		if( tool_choose[0] == 'Z' || tool_choose[0] == 'z' )
+		{
+			if(Main.tool_setting == 1 || Main.tool_setting == 2|| Main.tool_setting == 5|| Main.tool_setting == 6|| Main.tool_setting == 9|| Main.tool_setting == 10|| Main.tool_setting == 13|| Main.tool_setting == 14|| Main.tool_setting == 17|| Main.tool_setting == 18|| Main.tool_setting == 21|| Main.tool_setting == 22|| Main.tool_setting == 25|| Main.tool_setting == 26|| Main.tool_setting == 29|| Main.tool_setting == 30)
+			{
+				value_f = relative_pos.z;
+				Write_choose( value_f, 1);
+				Main.WarnningClear();
+			}
+			else if(Main.tool_setting == 3 || Main.tool_setting == 4|| Main.tool_setting == 7|| Main.tool_setting == 8|| Main.tool_setting == 11|| Main.tool_setting == 12|| Main.tool_setting == 15|| Main.tool_setting == 16|| Main.tool_setting == 19|| Main.tool_setting == 20|| Main.tool_setting == 23|| Main.tool_setting == 24|| Main.tool_setting == 27|| Main.tool_setting == 28|| Main.tool_setting == 31|| Main.tool_setting == 32)
+		    	return;
+		}
+		else
+		{
+//			Debug.Log("Format Error!!!");
+			Main.WarnningMessageCreate("格式错误");
+			return;
+		}	
+	}
+	
+	//刀偏+输入功能
+	public void Plus_Tool_Input (string input_value, bool plus_flag) 
+	{
+		char[] tool_choose = input_value.ToCharArray();
+		string value_str = "";
+		float value_f = 0;
+		for(int i = 0; i < tool_choose.Length; i++)
+		{
+			if(tool_choose[i] != '.'  && tool_choose[i] != '+' && tool_choose[i] != '-')
+			{
+				if(tool_choose[i] < '0' || tool_choose[i] > '9')
+				{
+					Debug.Log("Format Error!!!");
+					return;
+				}
+			}
+			else if(tool_choose[i] == '+' || tool_choose[i] == '-')
+			{
+				if(i != 0)
+				{
+					Debug.Log("Format Error!!!");
+					return;
+				}
+			}
+			value_str += tool_choose[i];
+		}
+		if(value_str == "+" || value_str == "-")
+		{
+			Debug.Log("Format Error!!!");
+			return;
+		}
+		value_f = float.Parse(value_str);
+		if(plus_flag)
+			Write_choose(value_f, 2);
+		else
+			Write_choose(value_f, 3);
+	}
+	
+	//刀偏输入框选择-陈晓威
+	void Write_choose (float value_f, int mode_flag) 
+	{
+		//Debug.Log(Main.tool_setting+"OOO");
+		//Debug.Log(Main.number+"NNN");
+		float[] aimArray=null;
+		string playerprefsArray=null;
+		//Debug.Log("type:"+Main.tool_setting%4);
+		switch(Main.tool_setting%4)
+		{
+		case 1:
+			aimArray=shape_H;
+			playerprefsArray="shape_H";
+			break;
+		case 2:
+			aimArray=wear_H;
+			playerprefsArray="wear_H";
+			break;
+		case 3:
+			aimArray=shape_D;
+			playerprefsArray="shape_D";
+			break;
+		case 0:
+			aimArray=wear_D;
+			playerprefsArray="wear_D";
+			break;
+		}
+		int pos=Main.tool_setting;
+		if(pos%4==0)pos--;
+		pos=pos/4+Main.number;
+		//Debug.Log(pos+"pos");
+		
+		if(mode_flag == 1||mode_flag==3)
+		{
+			aimArray[pos]=value_f;
+		}
+		else if(mode_flag == 2)
+		{
+			aimArray[pos]+=value_f;	
+		}
+		string wirte_info = playerprefsArray+pos.ToString() + "," + aimArray[pos].ToString();
+//		PlayerPrefs.SetFloat(playerprefsArray+pos,aimArray[pos]);
+		networkView.RPC("Tool_Info_WriteRPC", RPCMode.Server, wirte_info);
+	}
+
+	//设定界面下移
+	public void argu_down()
+	{
+		switch(Main.argu_setting)
+		{
+		case 1:
+			Main.argu_setting = 2;
+			ArguCursorPos();
+			break;
+		case 2:
+			Main.argu_setting = 3;
+			ArguCursorPos();
+			break;
+		case 3:
+			Main.argu_setting = 4;
+			ArguCursorPos();
+			break;
+		case 4:
+			Main.argu_setting = 5;
+			ArguCursorPos();
+			break;
+		case 5:
+			Main.argu_setting = 6;
+			ArguCursorPos();
+			break;
+		case 6:
+			Main.argu_setting = 7;
+			ArguCursorPos();
+			break;
+		case 7:
+			Main.argu_setting = 8;
+			ArguCursorPos();
+			break;
+		case 8:
+			Main.argu_setting = 9;
+			ArguCursorPos();
+			break;
+		}
+	}
+	
+		//设定界面上移
+	public void argu_up()
+	{
+		switch(Main.argu_setting)
+		{
+		case 9:
+			Main.argu_setting = 8;
+			ArguCursorPos();
+			break;
+		case 8:
+			Main.argu_setting = 7;
+			ArguCursorPos();
+			break;
+		case 7:
+			Main.argu_setting = 6;
+			ArguCursorPos();
+			break;
+		case 6:
+			Main.argu_setting = 5;
+			ArguCursorPos();
+			break;
+		case 5:
+			Main.argu_setting = 4;
+			ArguCursorPos();
+			break;
+		case 4:
+			Main.argu_setting = 3;
+			ArguCursorPos();
+			break;
+		case 3:
+			Main.argu_setting = 2;
+			ArguCursorPos();
+			break;
+		case 2:
+			Main.argu_setting = 1;
+			ArguCursorPos();
+			break;
+		}
+	}
+	
+	//黄色背景位置
+	public void ArguCursorPos()
+	{
+		switch(Main.argu_setting)
+		{
+		case 1:
+		    Main.argu_setting_cursor_y = Main.corner_py + 29.5f;
+			Main.argu_setting_cursor_w = 16f;
+			break;
+		case 2:
+			Main.argu_setting_cursor_y = Main.corner_py + 54.5f;
+			Main.argu_setting_cursor_w = 16f;
+			break;
+		case 3:
+			Main.argu_setting_cursor_y = Main.corner_py + 80f;
+			Main.argu_setting_cursor_w = 16f;
+			break;
+		case 4:
+			Main.argu_setting_cursor_y = Main.corner_py + 104.5f;
+			Main.argu_setting_cursor_w = 16f;
+			break;
+		case 5:
+			Main.argu_setting_cursor_y = Main.corner_py + 129.5f;
+			Main.argu_setting_cursor_w = 36f;
+			break;
+		case 6:
+			Main.argu_setting_cursor_y = Main.corner_py + 154.5f;
+			Main.argu_setting_cursor_w = 16f;
+			break;
+		case 7:
+			Main.argu_setting_cursor_y = Main.corner_py + 180f;
+			Main.argu_setting_cursor_w = 16f;
+			break;
+		case 8:
+			Main.argu_setting_cursor_y = Main.corner_py + 204.5f;
+			Main.argu_setting_cursor_w = 116f;
+			break;
+		case 9:
+			Main.argu_setting_cursor_y = Main.corner_py + 229.5f;
+			Main.argu_setting_cursor_w = 116f;
+			break;
+		}
+	}
+	
+	public void set_parameter(string input)
+	{
+		switch (Main.argu_setting)
+		{
+		case 1:
+			if( input == "0" || input=="1")
+			{
+				networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "parameter_writabel," + input);
+//				PlayerPrefs.SetString("parameter_writabel", input);
+			    parameter_writabel = input;
+				//Debug.Log(parameter);
+			}
+			else
+				Debug.Log("请输入0或1");
+			break;
+		case 2:
+		    if( input == "0" || input=="1")
+			{
+				networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "TV_check," + input);
+//				PlayerPrefs.SetString("TV_check", input);
+				TV_check = input;
+			}
+			else
+				Debug.Log("请输入0或1");
+			break;
+		case 3:
+			if( input == "0" || input=="1")
+			{
+				networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "hole_code," + input);
+//				PlayerPrefs.SetString("hole_code", input);
+				hole_code = input;
+			}
+			else
+				Debug.Log("请输入0或1");
+			break;
+		case 4:
+			if( input == "0" || input=="1")
+			{
+				networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "input_unit," + input);
+//				PlayerPrefs.SetString("input_unit", input);
+				input_unit = input;
+			}
+			else
+				Debug.Log("请输入0或1");
+			break;
+		case 5:
+			if(input.Length > 2)
+				Debug.Log("请输入0~35");
+			else
+			{
+				if(input.Length == 2)
+				{
+					Regex num_Reg = new Regex(@"\d{2}");
+					if(num_Reg.IsMatch(input))
+					{
+						int temp_value = Convert.ToInt32(input);
+						if(temp_value > 35)
+							Debug.Log("请输入0~35");
+						else
+						{
+							networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "IO," + input);
+//							PlayerPrefs.SetString("IO", input);
+							IO = input;	
+						}	
+					}
+					else
+						Debug.Log("请输入0~35");
+				}
+				else
+				{
+					
+					Regex num_Reg = new Regex(@"\d{1}");
+					if(num_Reg.IsMatch(input))
+					{
+						int temp_value = Convert.ToInt32(input);
+						if(temp_value > 35)
+							Debug.Log("请输入0~35");
+						else
+						{
+							networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "IO," + input);
+//							PlayerPrefs.SetString("IO", input);
+							IO = input;	
+						}	
+					}
+					else
+						Debug.Log("请输入0~35");
+				}
+			}
+			break;
+		case 6:
+			if( input == "0" || input=="1")
+			{
+				networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "sequence_number," + input);
+//				PlayerPrefs.SetString("sequence_number", input);
+				sequence_number= input;
+			}
+			else
+				Debug.Log("请输入0或1");
+			break;
+		case 7:
+			if( input == "0" || input=="1")
+			{
+				networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "paper_tape," + input);
+//				PlayerPrefs.SetString("paper_tape", input);
+				paper_tape = input;
+			}
+			else
+				Debug.Log("请输入0或1");
+			break;
+		case 8:
+			networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "SN_stop1," + input);
+//			PlayerPrefs.SetString("SN_stop1", input);
+			SN_stop1 = input;
+			break;
+		case 9:
+			networkView.RPC("Parameter_Info_WriteRPC", RPCMode.Server, "SN_stop2," + input);
+//			PlayerPrefs.SetString("SN_stop2", input);
+			SN_stop2 = input;
+			break;
+		default:
+			Debug.Log("out of range");
+			break;
+		}	
+	}
+	
+	//参数界面内容
+	public void ReadCooFile () 
+	{
+		ReadCooPrefs("G00",ref this.G00_pos);
+		//Debug.Log("test++:"+this.G00_pos.x+" "+this.G00_pos.y+" "+this.G00_pos.z);
+		ReadCooPrefs("G54",ref this.G54_pos);
+		ReadCooPrefs("G55",ref this.G55_pos);
+		ReadCooPrefs("G56",ref this.G56_pos);
+		ReadCooPrefs("G57",ref this.G57_pos);
+		ReadCooPrefs("G58",ref this.G58_pos);
+		ReadCooPrefs("G59",ref this.G59_pos);
+	}
+
+	//简化代码 陈晓威 05-08
+	public void Down () 
+	{
+		if(!(Main.coo_setting_1==7&&Main.coo_setting_2==3))
+		{
+			if(Main.coo_setting_2<3)
+			{	
+				Main.coo_setting_2++;
+			}
+			else
+			{
+				Main.coo_setting_2=1;
+				Main.coo_setting_1++;
+			}
+			if(Main.coo_setting_1==5)
+				Main.OffCooFirstPage = false;
+			CooCursorPos();
+		}
+	}
+	
+	//简化代码 陈晓威 05-08
+	public void Up () 
+	{
+		if(!(Main.coo_setting_1==1&&Main.coo_setting_2==1))
+		{
+			if(Main.coo_setting_2>1)
+			{	
+				Main.coo_setting_2--;
+			}
+			else
+			{
+				Main.coo_setting_2=3;
+				Main.coo_setting_1--;
+			}
+			if(Main.coo_setting_1==4)
+				Main.OffCooFirstPage = true;
+			CooCursorPos();
+		}
+	}
+	
+	public void Left () 
+	{
+		switch(Main.coo_setting_1)
+		{
+		case 1:
+			if(Main.coo_setting_2 == 3 || Main.coo_setting_2 == 2)
+			{
+				Main.coo_setting_2--;
+				Main.coo_setting_1 = 3;
+				CooCursorPos();
+			}
+			break;
+		case 2:
+			if(Main.coo_setting_2 == 3 || Main.coo_setting_2 == 2)
+			{
+				Main.coo_setting_2--;
+				Main.coo_setting_1 = 4;
+			}
+			else
+			{
+				Main.coo_setting_1 = 3;
+				Main.coo_setting_2 = 3;
+			}
+			CooCursorPos();
+			break;
+		case 3:
+			Main.coo_setting_1 = 1;
+			CooCursorPos();
+			break;
+		case 4:
+			Main.coo_setting_1 = 2;
+			CooCursorPos();
+			break;
+		case 5:
+			if(Main.coo_setting_2 == 3 || Main.coo_setting_2 == 2)
+			{
+				Main.coo_setting_2--;
+				Main.coo_setting_1 = 7;
+			}
+			else
+			{
+				Main.coo_setting_1 = 4;
+				Main.coo_setting_2 = 3;
+				Main.OffCooFirstPage = true;
+			}
+			CooCursorPos();
+			break;
+		case 6:
+			if(Main.coo_setting_2 == 3 || Main.coo_setting_2 == 2)
+			{
+				Main.coo_setting_2--;
+			}
+			else
+			{
+				Main.coo_setting_1 = 7;
+				Main.coo_setting_2 = 3;
+			}
+			CooCursorPos();
+			break;
+		case 7:
+			Main.coo_setting_1 = 5;
+			CooCursorPos();
+			break;
+		}
+	}
+	
+	public void Right () 
+	{
+		switch(Main.coo_setting_1)
+		{
+		case 1:
+			Main.coo_setting_1 = 3;
+			CooCursorPos();
+			break;
+		case 2:
+			Main.coo_setting_1 = 4;
+			CooCursorPos();
+			break;
+		case 3:
+			if(Main.coo_setting_2 == 1 || Main.coo_setting_2 == 2)
+			{
+				Main.coo_setting_2++;
+				Main.coo_setting_1 = 1;
+			}
+			else
+			{
+				Main.coo_setting_1 = 2;
+				Main.coo_setting_2 = 1;
+			}
+			CooCursorPos();
+			break;
+		case 4:
+			if(Main.coo_setting_2 == 1 || Main.coo_setting_2 == 2)
+			{
+				Main.coo_setting_2++;
+				Main.coo_setting_1 = 2;
+			}
+			else
+			{
+				Main.coo_setting_1 = 5;
+				Main.coo_setting_2 = 1;
+				Main.OffCooFirstPage = false;
+			}
+			CooCursorPos();
+			break;
+		case 5:
+			Main.coo_setting_1 = 7;
+			CooCursorPos();
+			break;
+		case 6:
+			if(Main.coo_setting_2 == 1 || Main.coo_setting_2 == 2)
+			{
+				Main.coo_setting_2++;
+				CooCursorPos();
+			}
+			break;
+		case 7:
+			if(Main.coo_setting_2 == 1 || Main.coo_setting_2 == 2)
+			{
+				Main.coo_setting_2++;
+				Main.coo_setting_1 = 5;
+			}
+			else
+			{
+				Main.coo_setting_1 = 6;
+				Main.coo_setting_2 = 1;
+			}
+			CooCursorPos();
+			break;
+		}
+	}
+	
+	public void PageUpCoo ()
+	{
+		switch (Main.coo_setting_1)
+		{
+		case 5:
+			Main.coo_setting_1 = 1;
+			break;
+		case 6:
+			Main.coo_setting_1 = 2;
+			break;
+		case 7:
+			Main.coo_setting_1 = 3;
+			break;
+		}
+	}
+	
+	public void PageDownCoo ()
+	{
+		switch (Main.coo_setting_1)
+		{
+		case 1:
+			Main.coo_setting_1 = 5;
+			break;
+		case 2:
+			Main.coo_setting_1 = 6;
+			break;
+		case 3:
+			Main.coo_setting_1 = 7;
+			break;
+		case 4:
+			Main.coo_setting_1 = 7;
+			Main.coo_setting_2 = 3;
+			CooCursorPos();
+			break;
+		}
+	}
+	
+	public void CooCursorPos () 
+	{
+		switch(Main.coo_setting_1%4)
+		{
+		case 1:
+			Main.coo_setting_cursor_x = Main.corner_px + 100f;
+			if(Main.coo_setting_2 == 1)
+				Main.coo_setting_cursor_y = Main.corner_py + 73f;
+			else if(Main.coo_setting_2 == 2)
+				Main.coo_setting_cursor_y = Main.corner_py + 99f;
+			else
+				Main.coo_setting_cursor_y = Main.corner_py + 125f;
+			break;
+		case 2:
+			Main.coo_setting_cursor_x = Main.corner_px + 100f;
+			if(Main.coo_setting_2 == 1)
+				Main.coo_setting_cursor_y = (Main.corner_py + 188.5f);
+			else if(Main.coo_setting_2 == 2)
+				Main.coo_setting_cursor_y = (Main.corner_py + 214f);
+			else
+				Main.coo_setting_cursor_y = (Main.corner_py + 241f);
+			break;
+		case 3:
+			Main.coo_setting_cursor_x = Main.corner_px + 344f;
+			if(Main.coo_setting_2 == 1)
+				Main.coo_setting_cursor_y = Main.corner_py + 73f;
+			else if(Main.coo_setting_2 == 2)
+				Main.coo_setting_cursor_y = Main.corner_py + 99f;
+			else
+				Main.coo_setting_cursor_y = Main.corner_py + 125f;
+			break;
+		case 0:
+			Main.coo_setting_cursor_x = Main.corner_px + 344f;
+			if(Main.coo_setting_2 == 1)
+				Main.coo_setting_cursor_y = (Main.corner_py + 188.5f);
+			else if(Main.coo_setting_2 == 2)
+				Main.coo_setting_cursor_y = (Main.corner_py + 214f);
+			else
+				Main.coo_setting_cursor_y = (Main.corner_py + 241f);
+			break;
+		}
+	}
+	
+	public void SearchNo (string num_str) 
+	{
+		string str_temp = num_str.TrimStart('0', ' ');
+		switch (str_temp)
+		{
+		case "":
+			Main.coo_setting_1 = 1;
+			Main.coo_setting_2 = 1;
+			CooCursorPos();
+			Main.OffCooFirstPage = true;
+			break;
+		case "1":
+			Main.coo_setting_1 = 2;
+			Main.coo_setting_2 = 1;
+			CooCursorPos();
+			Main.OffCooFirstPage = true;
+			break;
+		case "2":
+			Main.coo_setting_1 = 3;
+			Main.coo_setting_2 = 1;
+			CooCursorPos();
+			Main.OffCooFirstPage = true;
+			break;
+		case "3":
+			Main.coo_setting_1 = 4;
+			Main.coo_setting_2 = 1;
+			CooCursorPos();
+			Main.OffCooFirstPage = true;
+			break;
+		case "4":
+			Main.coo_setting_1 = 5;
+			Main.coo_setting_2 = 1;
+			CooCursorPos();
+			Main.OffCooFirstPage = false;
+			break;
+		case "5":
+			Main.coo_setting_1 = 6;
+			Main.coo_setting_2 = 1;
+			CooCursorPos();
+			Main.OffCooFirstPage = false;
+			break;
+		case "6":
+			Main.coo_setting_1 = 7;
+			Main.coo_setting_2 = 1;
+			CooCursorPos();
+			Main.OffCooFirstPage = false;
+			break;
+		default:
+			Debug.Log("格式不正确");
+			break;
+		}
+	}
+	
+	public void Measure (string coo_value)
+	{
+		char[] coo_choose = coo_value.ToCharArray();
+		string value_str = "";
+		float value_f = 0;
+		if(coo_choose.Length < 2 || (coo_choose[0] != 'X' && coo_choose[0] != 'Y'  && coo_choose[0] != 'Z' && coo_choose[0] != 'x' && coo_choose[0] != 'y' && coo_choose[0] != 'z' ))
+		{
+			Debug.Log("Format Error!!!");
+			return;
+		}
+		else
+		{
+			for(int i = 1; i < coo_choose.Length; i++)
+			{
+				if(coo_choose[i] != '.'  && coo_choose[i] != '+' && coo_choose[i] != '-')
+				{
+					if(coo_choose[i] < '0' || coo_choose[i] > '9')
+					{
+						Debug.Log("Format Error!!!");
+						return;
+					}
+				}
+				else if(coo_choose[i] == '+' || coo_choose[i] == '-')
+				{
+					if(i != 1)
+					{
+						Debug.Log("Format Error!!!");
+						return;
+					}
+				}
+				value_str += coo_choose[i];
+			}
+			if(value_str == "+" || value_str == "-")
+			{
+				Debug.Log("Format Error!!!");
+				return;
+			}
+			value_f = float.Parse(value_str);
+			//Debug.Log(value_f);
+			switch(coo_choose[0])
+			{
+			case 'X':
+			case 'x':
+				Measure_choose(1, value_f, 1);
+				Main.coo_setting_2 = 1;
+				break;
+			case 'Y':
+			case 'y':
+				Measure_choose(2, value_f, 1);
+				Main.coo_setting_2 = 2;
+				break;
+			case 'Z':
+			case 'z':
+				Measure_choose(3, value_f, 1);
+				Main.coo_setting_2 = 3;
+				break;
+			default:
+				Debug.Log("Format Error!!!");
+				break;
+			}
+			CooCursorPos();
+		}		
+	}
+	
+	public void PlusInput (string input_value, bool plus_flag) 
+	{
+		char[] coo_choose = input_value.ToCharArray();
+		string value_str = "";
+		float value_f = 0;
+		for(int i = 0; i < coo_choose.Length; i++)
+		{
+			if(coo_choose[i] != '.'  && coo_choose[i] != '+' && coo_choose[i] != '-')
+			{
+				if(coo_choose[i] < '0' || coo_choose[i] > '9')
+				{
+					Debug.Log("Format Error!!!");
+					return;
+				}
+			}
+			else if(coo_choose[i] == '+' || coo_choose[i] == '-')
+			{
+				if(i != 0)
+				{
+					Debug.Log("Format Error!!!");
+					return;
+				}
+			}
+			value_str += coo_choose[i];
+		}
+		if(value_str == "+" || value_str == "-")
+		{
+			Debug.Log("Format Error!!!");
+			return;
+		}
+		value_f = float.Parse(value_str);
+		if(plus_flag)
+			Measure_choose(Main.coo_setting_2, value_f, 2);
+		else
+			Measure_choose(Main.coo_setting_2, value_f, 3);
+	}
+	
+	void Measure_choose (int xyz_select, float value_f, int mode_flag) 
+	{
+		//Debug.Log(Main.coo_setting_1+"PPP");
+//		string write_str = "";
+		switch(Main.coo_setting_1)
+		{
+		case 1:
+			if(xyz_select == 1)
+			{
+				if(mode_flag == 1)
+					G00_pos.x = Main.MachineCoo.x - value_f;
+				else if(mode_flag == 2)
+					G00_pos.x += value_f; 
+				else
+					G00_pos.x = value_f; 
+//				write_str = G00_pos.x+","+G00_pos.y+","+G00_pos.z;
+				//WriteCooFile("G00", write_str);
+				SaveCool("G00",this.G00_pos);
+			}
+			else if(xyz_select == 2)
+			{
+				if(mode_flag == 1)
+					G00_pos.y = Main.MachineCoo.y - value_f;
+				else if(mode_flag == 2)
+					G00_pos.y += value_f; 
+				else
+					G00_pos.y = value_f; 
+//				write_str = G00_pos.x+","+G00_pos.y+","+G00_pos.z;
+				//WriteCooFile("G00", write_str);
+				SaveCool("G00",this.G00_pos);
+			}
+			else
+			{
+				if(mode_flag == 1)
+					G00_pos.z = Main.MachineCoo.z - value_f;
+				else if(mode_flag == 2)
+					G00_pos.z += value_f; 
+				else
+					G00_pos.z = value_f; 
+//				write_str = G00_pos.x+","+G00_pos.y+","+G00_pos.z;
+				//WriteCooFile("G00", write_str);
+				SaveCool("G00",this.G00_pos);
+			}
+			Main.OffCooFirstPage = true;
+			Workpiece_Change();
+			break;
+		case 2:
+			if(xyz_select == 1)
+			{
+				if(mode_flag == 1)
+					G54_pos.x = Main.MachineCoo.x - value_f;
+				else if(mode_flag == 2)
+					G54_pos.x += value_f; 
+				else
+					G54_pos.x = value_f; 
+//				write_str = G54_pos.x+","+G54_pos.y+","+G54_pos.z;
+				//WriteCooFile("G54", write_str);
+				SaveCool("G54",this.G54_pos);
+			}
+			else if(xyz_select == 2)
+			{
+				if(mode_flag == 1)
+					G54_pos.y = Main.MachineCoo.y - value_f;
+				else if(mode_flag == 2)
+					G54_pos.y += value_f; 
+				else
+					G54_pos.y = value_f; 
+//				write_str = G54_pos.x+","+G54_pos.y+","+G54_pos.z;
+				//WriteCooFile("G54", write_str);
+				SaveCool("G54",this.G54_pos);
+			}
+			else
+			{
+				if(mode_flag == 1)
+					G54_pos.z = Main.MachineCoo.z - value_f;
+				else if(mode_flag == 2)
+					G54_pos.z += value_f; 
+				else
+					G54_pos.z = value_f; 
+//				write_str = G54_pos.x+","+G54_pos.y+","+G54_pos.z;
+				//WriteCooFile("G54", write_str);
+				SaveCool("G54",this.G54_pos);
+			}
+			Main.OffCooFirstPage = true;
+			Workpiece_Change();
+			break;
+		case 3:
+			if(xyz_select == 1)
+			{
+				if(mode_flag == 1)
+					G55_pos.x = Main.MachineCoo.x - value_f;
+				else if(mode_flag == 2)
+					G55_pos.x += value_f; 
+				else
+					G55_pos.x = value_f; 
+//				write_str = G55_pos.x+","+G55_pos.y+","+G55_pos.z;
+				//WriteCooFile("G55", write_str);
+				SaveCool("G55",this.G55_pos);
+			}
+			else if(xyz_select == 2)
+			{
+				if(mode_flag == 1)
+					G55_pos.y = Main.MachineCoo.y - value_f;
+				else if(mode_flag == 2)
+					G55_pos.y += value_f; 
+				else
+					G55_pos.y = value_f; 
+//				write_str = G55_pos.x+","+G55_pos.y+","+G55_pos.z;
+				//WriteCooFile("G55", write_str);
+				SaveCool("G55",this.G55_pos);
+			}
+			else
+			{
+				if(mode_flag == 1)
+					G55_pos.z = Main.MachineCoo.z - value_f;
+				else if(mode_flag == 2)
+					G55_pos.z += value_f; 
+				else
+					G55_pos.z = value_f; 
+//				write_str = G55_pos.x+","+G55_pos.y+","+G55_pos.z;
+				//WriteCooFile("G55", write_str);
+				SaveCool("G55",this.G55_pos);
+			}
+			Main.OffCooFirstPage = true;
+			Workpiece_Change();
+			break;
+		case 4:
+			if(xyz_select == 1)
+			{
+				if(mode_flag == 1)
+					G56_pos.x = Main.MachineCoo.x - value_f;
+				else if(mode_flag == 2)
+					G56_pos.x += value_f; 
+				else
+					G56_pos.x = value_f; 
+//				write_str = G56_pos.x+","+G56_pos.y+","+G56_pos.z;
+				//WriteCooFile("G56", write_str);
+				SaveCool("G56",this.G56_pos);
+			}
+			else if(xyz_select == 2)
+			{
+				if(mode_flag == 1)
+					G56_pos.y = Main.MachineCoo.y - value_f;
+				else if(mode_flag == 2)
+					G56_pos.y += value_f; 
+				else
+					G56_pos.y = value_f;
+//				write_str = G56_pos.x+","+G56_pos.y+","+G56_pos.z;
+				//WriteCooFile("G56", write_str);
+				SaveCool("G56",this.G56_pos);
+			}
+			else
+			{
+				if(mode_flag == 1)
+					G56_pos.z = Main.MachineCoo.z - value_f;
+				else if(mode_flag == 2)
+					G56_pos.z += value_f; 
+				else
+					G56_pos.z = value_f;
+//				write_str = G56_pos.x+","+G56_pos.y+","+G56_pos.z;
+				//WriteCooFile("G56", write_str);
+				SaveCool("G56",this.G56_pos);
+			}
+			Main.OffCooFirstPage = true;
+			Workpiece_Change();
+			break;
+		case 5:
+			if(xyz_select == 1)
+			{
+				if(mode_flag == 1)
+					G57_pos.x = Main.MachineCoo.x - value_f;
+				else if(mode_flag == 2)
+					G57_pos.x += value_f; 
+				else
+					G57_pos.x = value_f;
+//				write_str = G57_pos.x+","+G57_pos.y+","+G57_pos.z;
+				//WriteCooFile("G57", write_str);
+				SaveCool("G57",this.G57_pos);
+			}
+			else if(xyz_select == 2)
+			{
+				if(mode_flag == 1)
+					G57_pos.y = Main.MachineCoo.y - value_f;
+				else if(mode_flag == 2)
+					G57_pos.y += value_f; 
+				else
+					G57_pos.y = value_f;
+//				write_str = G57_pos.x+","+G57_pos.y+","+G57_pos.z;
+				//WriteCooFile("G57", write_str);
+				SaveCool("G57",this.G57_pos);
+			}
+			else
+			{
+				if(mode_flag == 1)
+					G57_pos.z = Main.MachineCoo.z - value_f;
+				else if(mode_flag == 2)
+					G57_pos.z += value_f; 
+				else
+					G57_pos.z = value_f;
+//				write_str = G57_pos.x+","+G57_pos.y+","+G57_pos.z;
+				//WriteCooFile("G57", write_str);
+				SaveCool("G57",this.G57_pos);
+			}
+			Main.OffCooFirstPage = false;
+			Workpiece_Change();
+			break;
+		case 6:
+			if(xyz_select == 1)
+			{
+				if(mode_flag == 1)
+					G58_pos.x = Main.MachineCoo.x - value_f;
+				else if(mode_flag == 2)
+					G58_pos.x += value_f; 
+				else
+					G58_pos.x = value_f;
+//				write_str = G58_pos.x+","+G58_pos.y+","+G58_pos.z;
+				//WriteCooFile("G58", write_str);
+				SaveCool("G58",this.G58_pos);
+			}
+			else if(xyz_select == 2)
+			{
+				if(mode_flag == 1)
+					G58_pos.y = Main.MachineCoo.y - value_f;
+				else if(mode_flag == 2)
+					G58_pos.y += value_f; 
+				else
+					G58_pos.y = value_f;
+//				write_str = G58_pos.x+","+G58_pos.y+","+G58_pos.z;
+				//WriteCooFile("G58", write_str);
+				SaveCool("G58",this.G58_pos);
+			}
+			else
+			{
+				if(mode_flag == 1)
+					G58_pos.z = Main.MachineCoo.z - value_f;
+				else if(mode_flag == 2)
+					G58_pos.z += value_f; 
+				else
+					G58_pos.z = value_f;
+//				write_str = G58_pos.x+","+G58_pos.y+","+G58_pos.z;
+				//WriteCooFile("G58", write_str);
+				SaveCool("G58",this.G58_pos);
+			}
+			Main.OffCooFirstPage = false;
+			Workpiece_Change();
+			break;
+		case 7:
+			if(xyz_select == 1)
+			{
+				if(mode_flag == 1)
+					G59_pos.x = Main.MachineCoo.x - value_f;
+				else if(mode_flag == 2)
+					G59_pos.x += value_f; 
+				else
+					G59_pos.x = value_f;
+//				write_str = G59_pos.x+","+G59_pos.y+","+G59_pos.z;
+				//WriteCooFile("G59", write_str);
+				SaveCool("G59",this.G59_pos);
+			}
+			else if(xyz_select == 2)
+			{
+				if(mode_flag == 1)
+					G59_pos.y = Main.MachineCoo.y - value_f;
+				else if(mode_flag == 2)
+					G59_pos.y += value_f; 
+				else
+					G59_pos.y = value_f;
+//				write_str = G59_pos.x+","+G59_pos.y+","+G59_pos.z;
+				//WriteCooFile("G59", write_str);
+				SaveCool("G59",this.G59_pos);
+			}
+			else
+			{
+				if(mode_flag == 1)
+					G59_pos.z = Main.MachineCoo.z - value_f;
+				else if(mode_flag == 2)
+					G59_pos.z += value_f; 
+				else
+					G59_pos.z = value_f;
+//				write_str = G59_pos.x+","+G59_pos.y+","+G59_pos.z;
+				//WriteCooFile("G59", write_str);
+				SaveCool("G59",this.G59_pos);
+			}
+			Main.OffCooFirstPage = false;
+			Workpiece_Change();
+			break;
+		default:
+			break;
+		}
+	}
+	
+	
+	/*
+	// Update is called once per frame
+	void Update () {
+		absolute_pos = MoveControl_script.MachineCoo - G00_pos - workpiece_coo;
+		relative_pos = MoveControl_script.MachineCoo - G00_pos - workpiece_coo;
+	}
+	*/
+	
+	public void CurrentVirtualPos()
+	{
+		
+	}
+	
+	
+	public void Workpiece_Change () {
+		switch (workpiece_flag)
+		{
+		case (int)WorkpieceCooSys.G54:
+			workpiece_coo = G54_pos;
+			break;
+		case (int)WorkpieceCooSys.G55:
+			workpiece_coo = G55_pos;
+			break;
+		case (int)WorkpieceCooSys.G56:
+			workpiece_coo = G56_pos;
+			break;
+		case (int)WorkpieceCooSys.G57:
+			workpiece_coo = G57_pos;
+			break;
+		case (int)WorkpieceCooSys.G58:
+			workpiece_coo = G58_pos;
+			break;
+		case (int)WorkpieceCooSys.G59:
+			workpiece_coo = G59_pos;
+			break;
+		default:
+			Debug.Log("workpiece flag is wrong!!!");
+			break;
+		}
+		AbsoluteZero = - G00_pos - workpiece_coo;
+	}
+	
+	/// <summary>
+	/// 从PlayerPrefs读取坐标系---陈晓威 05-08
+	/// </summary>
+	/// <param name='cooname'>
+	/// 坐标系名称
+	/// </param>
+	/// <param name='vt3'>
+	/// 坐标系向量
+	/// </param>
+	public void ReadCooPrefs(string cooname,ref Vector3 vt3)
+	{
+		string coostr;
+		string[]templist;
+		if(PlayerPrefs.HasKey(cooname))
+		{
+			coostr=PlayerPrefs.GetString(cooname);
+			templist=coostr.Split(',');
+			vt3.Set(float.Parse(templist[0]),float.Parse(templist[1]),float.Parse(templist[2]));
+		}
+		else
+		{
+			PlayerPrefs.SetString(cooname,"0,0,0");
+			vt3.Set(0,0,0);
+		}
+	}
+	
+	
+	/// <summary>
+	/// 把坐标系保存到PlayerPrefs---陈晓威 05-08
+	/// </summary>
+	/// <param name='cooname'>
+	/// 坐标系名称
+	/// </param>
+	/// <param name='ct3'>
+	/// 坐标系向量
+	/// </param>
+	public void SaveCool(string cooname,Vector3 ct3)
+	{
+		PlayerPrefs.SetString(cooname,ct3.x+","+ct3.y+","+ct3.z);
+		networkView.RPC("SaveCooRPC", RPCMode.Server, cooname +","+ ct3.x+","+ct3.y+","+ct3.z);
+	}
+	
+	
+}
