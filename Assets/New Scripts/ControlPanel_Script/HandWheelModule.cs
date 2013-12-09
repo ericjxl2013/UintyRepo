@@ -578,19 +578,13 @@ public class HandWheelModule : MonoBehaviour {
 		
 		if(GUI.Button(new Rect(44, 214, 50, 40), "", Main.sty_ButtonEmpty)){
 			handWheelDirection = 2;
-			string info = "";
-			info = HandWheel_OFF.ToString() + "," + handWheelDirection.ToString() + "," + Scale_Offset_HandWheel.ToString() + "," + 
-				X_HandWheel.ToString() + "," + Y_HandWheel.ToString() + "," + Z_HandWheel.ToString();
-			Main.HandWheelControl(info);
+			Main.HandWheelControl(handWheelDirection.ToString());
 			rotatedAngle -= 3.6f;
 		}
 		
 		if(GUI.Button(new Rect(94, 214, 50, 40), "", Main.sty_ButtonEmpty)){
 			handWheelDirection = 1;
-			string info = "";
-			info = HandWheel_OFF.ToString() + "," + handWheelDirection.ToString() + "," + Scale_Offset_HandWheel.ToString() + "," + 
-				X_HandWheel.ToString() + "," + Y_HandWheel.ToString() + "," + Z_HandWheel.ToString();
-			Main.HandWheelControl(info);
+			Main.HandWheelControl(handWheelDirection.ToString());
 			rotatedAngle += 3.6f;
 		}
 
@@ -699,8 +693,7 @@ public class HandWheelModule : MonoBehaviour {
 				{
 					audio.Play ();
 					string info = "";
-					info = HandWheel_OFF.ToString() + "," + handWheelDirection.ToString() + "," + Scale_Offset_HandWheel.ToString() + "," + 
-						X_HandWheel.ToString() + "," + Y_HandWheel.ToString() + "," + Z_HandWheel.ToString();
+					info = handWheelDirection.ToString();
 					Main.HandWheelControl(info);
 				}	
 				

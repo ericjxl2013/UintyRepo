@@ -37,6 +37,8 @@ public class AutoDisplayControl : MonoBehaviour {
 	bool motionAllow = false;
 	float oldDistance = 0;
 	float newDistance = 0;
+	bool moveZoomOn = false;
+	bool move_zoom = false;  //false缩放；true平移
 	
 	// Use this for initialization
 	void Start () {
@@ -309,49 +311,66 @@ public class AutoDisplayControl : MonoBehaviour {
 						networkView.RPC("RotateMotion", RPCMode.Server, "0,0");
 					}
 					
-					//两个手指缩放
-					if(Input.touchCount == 2 && (Input.GetTouch(0).phase == TouchPhase.Moved || Input.GetTouch(1).phase == TouchPhase.Moved)){
-						pattern = 2;
-						newDistance = Vector2.Distance(Input.GetTouch(0).position, Input.GetTouch(1).position);
-						if(newDistance < oldDistance){
-							networkView.RPC("ZoomMotion", RPCMode.Server, 0.2f);
-							distance2V = 1;
-						}else if(newDistance > oldDistance){
-							networkView.RPC("ZoomMotion", RPCMode.Server, -0.2f);
-							distance2V = -1;
-						}else{
-							networkView.RPC("ZoomMotion", RPCMode.Server, 0f);
-							distance2V = 0;
+					//缩放或者平移
+					if(Input.touchCount >= 2){
+						//两个或以上手指移动
+						if(Input.GetTouch(0).phase == TouchPhase.Moved || Input.GetTouch(1).phase == TouchPhase.Moved){
+							//判断是平移还是缩放
+							if(!moveZoomOn){
+								if(oldPosition1 == Vector2.zero && oldPosition2 == Vector2.zero){
+									oldPosition1 = Input.GetTouch(0).position;
+									oldPosition2 = Input.GetTouch(1).position;
+									return;
+								}
+								if(MoveZoom(oldPosition1, oldPosition2, Input.GetTouch(0).position, Input.GetTouch(1).position)){  
+									move_zoom = true; //平移
+								}else{
+									move_zoom = false;  //缩放
+								}
+								moveZoomOn = true;
+								oldPosition1 = Input.GetTouch(0).position;
+								oldPosition2 = Input.GetTouch(1).position;
+							}else{
+								if(move_zoom){//平移
+									x = Input.GetTouch(0).deltaPosition.x;
+									y = Input.GetTouch(0).deltaPosition.y;
+									if(x > 10f)
+										x = x / 10f;
+									else
+										x = x / 5f;
+									if(y > 10f)
+										y = y / 10f;
+									else
+										y = y / 5f;
+									networkView.RPC("MoveMotion", RPCMode.Server, x+","+y);
+								}else{//缩放
+									newDistance = Vector2.Distance(Input.GetTouch(0).position, Input.GetTouch(1).position);
+									if(newDistance < oldDistance){
+										networkView.RPC("ZoomMotion", RPCMode.Server, 0.2f);
+										distance2V = 1;
+									}else if(newDistance > oldDistance){
+										networkView.RPC("ZoomMotion", RPCMode.Server, -0.2f);
+										distance2V = -1;
+									}else{
+										networkView.RPC("ZoomMotion", RPCMode.Server, 0f);
+										distance2V = 0;
+									}
+									oldDistance = newDistance;
+								}
+								oldPosition1 = Input.GetTouch(0).position;
+								oldPosition2 = Input.GetTouch(1).position;
+							}
 						}
-						oldDistance = newDistance;		
-					}
-					//两个手指不动时缩放失效
-					if(Input.touchCount == 2 && (Input.GetTouch(0).phase != TouchPhase.Moved && Input.GetTouch(1).phase != TouchPhase.Moved)){
-						oldDistance = 0;
-						newDistance = 0;
-						distance2V = 2;
-						networkView.RPC("ZoomMotion", RPCMode.Server, 0f);
-					}
-					
-					//三个手指平移
-					if(Input.touchCount == 3 && (Input.GetTouch(0).phase == TouchPhase.Moved && Input.GetTouch(1).phase == TouchPhase.Moved && Input.GetTouch(2).phase == TouchPhase.Moved)){
-						pattern = 3;
-						x = Input.GetTouch(0).deltaPosition.x;
-						y = Input.GetTouch(0).deltaPosition.y;
-						if(x > 10f)
-							x = x / 10f;
-						else
-							x = x / 5f;
-						if(y > 10f)
-							y = y / 10f;
-						else
-							y = y / 5f;
-						networkView.RPC("MoveMotion", RPCMode.Server, x+","+y);
-					}
-					//三个手指平移失效
-					if(Input.touchCount == 3 && !(Input.GetTouch(0).phase == TouchPhase.Moved && Input.GetTouch(1).phase == TouchPhase.Moved && Input.GetTouch(2).phase == TouchPhase.Moved)){
-						x = 0; y = 0;
-						networkView.RPC("MoveMotion", RPCMode.Server, "0,0");
+						
+						//最初两个手指静止
+						if(Input.GetTouch(0).phase != TouchPhase.Moved && Input.GetTouch(1).phase != TouchPhase.Moved){
+							oldDistance = 0;
+							newDistance = 0;
+							distance2V = 2;
+							networkView.RPC("ZoomMotion", RPCMode.Server, 0f);
+							x = 0; y = 0;
+							networkView.RPC("MoveMotion", RPCMode.Server, "0,0");
+						}
 					}
 				}
 			}else{
@@ -359,10 +378,13 @@ public class AutoDisplayControl : MonoBehaviour {
 					networkView.RPC("MobileMotion", RPCMode.Server, false);
 					x = 0;
 					y = 0;
+					oldPosition1 = Vector2.zero;
+					oldPosition2 = Vector2.zero;
 					distance2V = 0;
 					oldDistance = 0;
 					newDistance = 0;
 					pattern = 0;
+					moveZoomOn = false;
 					pressTime = 0;
 					motionAllow = false;
 				}
@@ -437,5 +459,36 @@ public class AutoDisplayControl : MonoBehaviour {
 //			}
 //		}
 	}
+	
+	/// <summary>
+	/// 判断是平移还是缩放
+	/// </summary>
+	/// <returns>
+	/// true:平移; flase:缩放
+	/// </returns>
+	/// <param name='oldP1'>
+	/// If set to <c>true</c> old p1.
+	/// </param>
+	/// <param name='oldP2'>
+	/// If set to <c>true</c> old p2.
+	/// </param>
+	/// <param name='newP1'>
+	/// If set to <c>true</c> new p1.
+	/// </param>
+	/// <param name='newP2'>
+	/// If set to <c>true</c> new p2.
+	/// </param>
+	bool MoveZoom(Vector2 oldP1,Vector2 oldP2,Vector2 newP1,Vector2 newP2)
+	{
+		Vector2 p1=newP1-oldP1;
+		Vector2 p2=newP2-oldP2;
+		float angle= Vector2.Angle(p1,p2);
+		if((angle < 60 && angle > -60 ) || (angle < 360 && angle > 300)){
+			return true;
+		}else{
+			return false;
+		}
+	}
+
 	 
 }
